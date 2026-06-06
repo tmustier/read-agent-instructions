@@ -1,0 +1,51 @@
+{
+  "name": "read-agent-instructions",
+  "version": "0.1.0",
+  "description": "Pi package that injects nearby AGENTS.md-style instructions into read tool results.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Thomas Mustier",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "AGENTS.md",
+    "agents-md",
+    "coding-agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tmustier/read-agent-instructions.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tmustier/read-agent-instructions/issues"
+  },
+  "homepage": "https://github.com/tmustier/read-agent-instructions#readme",
+  "files": [
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "verify": "tsx scripts/verify-harness.ts",
+    "verify:tmux": "tsx scripts/verify-harness.ts --tmux-proof",
+    "check": "npm run typecheck && npm test && npm run verify",
+    "prepublishOnly": "npm run check"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.78.1",
+    "@types/node": "^25.9.2",
+    "tsx": "^4.22.4",
+    "typescript": "5.9.3"
+  }
+}
