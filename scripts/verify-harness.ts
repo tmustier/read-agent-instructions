@@ -15,7 +15,7 @@ async function writeTextFile(path: string, content: string): Promise<void> {
   await writeFile(path, content, "utf8");
 }
 
-async function createScenario(): Promise<{ workspace: string; results: SimulatedToolResult[] }> {
+async function createScenario(): Promise<{ workspace: string; repoA: string; results: SimulatedToolResult[] }> {
   const workspace = await mkdtemp(join(tmpdir(), "read-agent-instructions-harness-"));
   const repoA = join(workspace, "repoA");
   const repoB = join(workspace, "repoB");
@@ -23,6 +23,7 @@ async function createScenario(): Promise<{ workspace: string; results: Simulated
   await mkdir(join(repoA, ".git"), { recursive: true });
   await mkdir(join(repoB, ".git"), { recursive: true });
 
+  await writeTextFile(join(workspace, "AGENTS.md"), "Parent workspace instruction: this must not leak into child git repos.");
   await writeTextFile(join(repoA, "AGENTS.md"), "Repo A root instruction: run npm test before claiming done.");
   await writeTextFile(
     join(repoA, "packages", "api", "AGENTS.md"),
@@ -35,6 +36,7 @@ async function createScenario(): Promise<{ workspace: string; results: Simulated
 
   return {
     workspace,
+    repoA,
     results: [
       {
         label: "repoA first read",
@@ -57,7 +59,7 @@ async function createScenario(): Promise<{ workspace: string; results: Simulated
 
 async function main(): Promise<void> {
   const proofMode = process.argv.includes("--tmux-proof");
-  const { workspace, results } = await createScenario();
+  const { workspace, repoA, results } = await createScenario();
   const collector = new AgentInstructionCollector();
 
   console.log(`workspace=${workspace}`);
@@ -90,13 +92,30 @@ async function main(): Promise<void> {
     const repoBIsIsolated =
       (repoBFirst?.payload.includes("Repo B root instruction") ?? false) &&
       !(repoBFirst?.payload.includes("Repo A root instruction") ?? true);
+    const parentInstructionDidNotLeak = !(repoAFirst?.payload.includes("Parent workspace instruction") ?? true);
+
+    const adversarialCollector = new AgentInstructionCollector();
+    const selfReadDiscoveries = await adversarialCollector.collectForRead({
+      cwd: workspace,
+      requestedPath: join(repoA, "AGENTS.md"),
+    });
+    const selfReadDidNotEcho = selfReadDiscoveries.length === 0;
 
     console.log(`\nTMUX_PROOF repoA_payload_has_root_instruction=${repoAHasRoot}`);
     console.log(`TMUX_PROOF repoA_payload_has_subtree_instruction=${repoAHasSubtree}`);
     console.log(`TMUX_PROOF repeated_repoA_read_has_no_repeated_instruction=${repeatedHasNoInstruction}`);
     console.log(`TMUX_PROOF repoB_payload_isolated_from_repoA=${repoBIsIsolated}`);
+    console.log(`TMUX_PROOF parent_workspace_instruction_did_not_leak=${parentInstructionDidNotLeak}`);
+    console.log(`TMUX_PROOF agents_md_self_read_did_not_echo=${selfReadDidNotEcho}`);
 
-    if (!repoAHasRoot || !repoAHasSubtree || !repeatedHasNoInstruction || !repoBIsIsolated) {
+    if (
+      !repoAHasRoot ||
+      !repoAHasSubtree ||
+      !repeatedHasNoInstruction ||
+      !repoBIsIsolated ||
+      !parentInstructionDidNotLeak ||
+      !selfReadDidNotEcho
+    ) {
       throw new Error("tmux proof assertions failed");
     }
   }
