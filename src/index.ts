@@ -24,6 +24,13 @@ export default function readAgentInstructions(pi: ExtensionAPI): void {
       return;
     }
 
+    // A read issued by another tool (for example a codemode script) returns its text to that
+    // tool, not to the model. Appending there corrupts the caller's data, and marking the
+    // instructions as announced would hide them from the model's next direct read.
+    if ((event as { parentToolCallId?: string }).parentToolCallId !== undefined) {
+      return;
+    }
+
     const requestedPath = readPathFromInput(event.input);
     if (requestedPath === undefined || requestedPath.trim().length === 0 || requestedPath === "-") {
       return;
